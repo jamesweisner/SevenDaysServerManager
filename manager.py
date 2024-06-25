@@ -78,7 +78,7 @@ class Manager:
 					self.send('pm', [username, 'Portal set.'])
 					continue
 				if event == 'home':
-					self.players[username]['home'] = location
+					self.players[username]['home'] = location # A coordinate list.
 					self.save_players()
 					self.events.remove(item)
 					self.send('pm', [username, 'Home set.'])
@@ -88,6 +88,7 @@ class Manager:
 					self.players[sender]['balance'] -= amount
 					self.players[username]['balance'] += amount
 					self.save_players()
+					self.events.remove(item)
 					self.send('pm', [sender, f'Sent {amount} coins to {username}.'])
 					self.send('pm', [username, f'Received {amount} coins from {sender}.'])
 					continue
@@ -106,9 +107,11 @@ class Manager:
 		self.init_player(username)
 		self.send('listplayers', [])
 		self.trigger('bag', pid, location)
+		# TODO not working?
 
 	def handle_kill(self, username, entity):
 		self.init_player(username)
+		print(f' x {username}: {entity}')
 		if entity.startswith('zombie'):
 			self.players[username]['balance'] += 1
 
@@ -123,7 +126,7 @@ class Manager:
 
 	def command_help(self, username, args):
 		return ' '.join([f'/{c}' for c in self.commands.keys()])
-		# TODO argument & coins cost
+		# TODO show arguments & coin costs
 
 	def command_listtele(self, username, args):
 		return ', '.join([f'{p}' for p in self.portals.keys()])
@@ -134,7 +137,7 @@ class Manager:
 		if not self.pay_fee(username, 50):
 			return 'Insufficient funds. Cost is 50 coins.'
 		self.send('listplayers', [])
-		self.trigger('tele', username, args)
+		self.trigger('tele', username, [args])
 		return 'Setting teleport location, hold still...'
 
 	def command_remtele(self, username, args):
@@ -166,12 +169,13 @@ class Manager:
 		home = self.players[username].get('home', None)
 		if not home:
 			return 'Cannot find home. Please use /sethome first.'
-		self.send('teleportplayer', [username, home])
+		self.send('teleportplayer', [username] + home)
 		return 'Welcome home!'
 
 	def command_visit(self, username, args):
 		if not self.pay_fee(username, 1):
 			return 'Insufficient funds. Cost is 1 coin.'
+		# TODO what if the player is not found?
 		self.send('teleportplayer', [username, args])
 		return 'Zoop!'
 

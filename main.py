@@ -24,6 +24,12 @@ bag_regex = compile(
 	r"\((?P<location>.+?)\).*"
 )
 
+kill_regex = compile(
+	# 2024-06-25T15:08:39 64611.265 INF Entity zombieBurnt 2238 killed by PhysicsPolice 171
+	r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2} \d+\.\d+ INF "
+	r"Entity (?P<entity>.+?) \d+ killed by (?P<username>.+?) \d+"
+)
+
 try:
 	while True:
 
@@ -45,7 +51,7 @@ try:
 				if match:
 					pid, username, location = match.groups()
 					location = [round(float(d)) for d in location.split(', ')]
-					manager.set_player(int(pid), username, location)
+					manager.handle_player(int(pid), username, location)
 					continue
 
 				# Watch for dropped bags.
@@ -53,7 +59,7 @@ try:
 				if match:
 					pid, location = match.groups()
 					location = [round(float(d)) for d in location.split(', ')]
-					manager.set_bag(int(pid), location)
+					manager.handle_bag(int(pid), location)
 					continue
 
 				# Watch player chat for commands.
@@ -63,7 +69,14 @@ try:
 					if not message[0] == '/':
 						continue # Not a command.
 					command, args = (message[1:] + ' ').split(' ', 1)
-					manager.handle(username, command, args.strip())
+					manager.handle_command(username, command, args.strip())
+					continue
+
+				# Watch for Zombie kills.
+				match = kill_regex.match(line)
+				if match:
+					entity, username = match.groups()
+					manager.handle_kill(username, entity)
 					continue
 
 		except Exception:

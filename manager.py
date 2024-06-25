@@ -1,8 +1,8 @@
 from json import load, dump, dumps
+from functools import wraps
+from time import time
 
 class Manager:
-
-	# TODO implement zcoins and charge for services
 
 	def __init__(self, client):
 		self.client = client
@@ -17,6 +17,8 @@ class Manager:
 			'home': self.command_home,
 			'visit': self.command_visit,
 			'bag': self.command_bag,
+			'wallet': self.command_wallet,
+			'pay': self.command_pay,
 		}
 		try:
 			with open('players.json') as file:
@@ -33,105 +35,170 @@ class Manager:
 
 	def save_players(self):
 		with open('players.json', 'w') as file:
-			dump(self.players, file)
+			dump(self.players, file, indent=2)
 
 	def save_portals(self):
 		with open('portals.json', 'w') as file:
-			dump(self.portals, file)
+			dump(self.portals, file, indent=2)
 
 	def send(self, command, args):
 		self.client.send(' '.join([command] + [dumps(p) for p in args]))
 
-	def set_player(self, pid, username, location):
+	def pay_fee(self, username, amount):
+		if self.players[username]['balance'] < amount:
+			return False
+		self.players[username]['balance'] -= amount
+		self.save_players()
+		return True
+
+	def trigger(self, event, key, args):
+		self.events.append((event, key, args, time() + 5))
+
+	def init_player(self, username):
 		if not username in self.players:
-			self.players[username] = {}
-		for event in self.events[:]:
-			mode, key, arg = event
+			self.players[username] = { 'balance': 0 }
+			self.save_players()
+
+	def handle_player(self, pid, username, location):
+
+		# Track every player we see.
+		self.init_player(username)
+
+		# Work on a copy of the list so we can saefly remove items from the original.
+		for item in self.events[:]:
+			event, key, args, expires = item
 			if key == username:
-				if mode == 'tele':
-					self.portals[arg] = {
+				if event == 'tele':
+					self.portals[args[0]] = {
 						'loc': location,
 						'username': username,
 					}
 					self.save_portals()
-					self.events.remove(event)
+					self.events.remove(item)
 					self.send('pm', [username, 'Portal set.'])
-				if mode == 'home':
+					continue
+				if event == 'home':
 					self.players[username]['home'] = location
 					self.save_players()
-					self.events.remove(event)
+					self.events.remove(item)
 					self.send('pm', [username, 'Home set.'])
-			if key == pid:
-				if mode == 'bag':
-					self.players[username]['bag'] = location
+					continue
+				if event == 'pay':
+					sender, amount = args
+					self.players[sender]['balance'] -= amount
+					self.players[username]['balance'] += amount
 					self.save_players()
-					self.events.remove(event)
+					self.send('pm', [sender, f'Sent {amount} coins to {username}.'])
+					self.send('pm', [username, f'Received {amount} coins from {sender}.'])
+					continue
+			if key == pid:
+				if event == 'bag':
+					self.players[username]['bag'] = args # A coordinate list.
+					self.save_players()
+					self.events.remove(item)
+					continue
+			if time() > expires:
+				if event == 'pay':
+					self.send('pm', [sender, f'Recipient not found. Players must be online to receive funds.'])
+				self.events.remove(item)
 
-	def set_bag(self, pid, location):
+	def handle_bag(self, pid, location):
+		self.init_player(username)
 		self.send('listplayers', [])
-		self.events.append(('bag', pid, location))
+		self.trigger('bag', pid, location)
 
-	def handle(self, username, command, args):
+	def handle_kill(self, username, entity):
+		self.init_player(username)
+		if entity.startswith('zombie'):
+			self.players[username]['balance'] += 1
+
+	def handle_command(self, username, command, args):
+		self.init_player(username)
 		if not command in self.commands:
 			self.send('pm', [username, 'Unknown command. Type /help to list commands.'])
 			return
 		print(f' > {username}: /{command} {args}')
-		self.commands[command](username, args)
+		response = self.commands[command](username, args)
+		self.send('pm', [username, response])
 
 	def command_help(self, username, args):
-		self.send('pm', [username, ' '.join([f'/{c}' for c in self.commands.keys()])])
+		return ' '.join([f'/{c}' for c in self.commands.keys()])
+		# TODO argument & coins cost
 
 	def command_listtele(self, username, args):
-		self.send('pm', [username, ', '.join([f'{p}' for p in self.portals.keys()])])
+		return ', '.join([f'{p}' for p in self.portals.keys()])
 
 	def command_settele(self, username, args):
 		if args in self.portals:
-			self.send('pm', [username, 'This portal already exists.'])
-			return
-		self.send('pm', [username, 'Setting teleport location, hold still...'])
+			return 'This portal already exists.'
+		if not self.pay_fee(username, 50):
+			return 'Insufficient funds. Cost is 50 coins.'
 		self.send('listplayers', [])
-		self.events.append(('tele', username, args))
+		self.trigger('tele', username, args)
+		return 'Setting teleport location, hold still...'
 
 	def command_remtele(self, username, args):
 		if not args in self.portals:
-			self.send('pm', [username, 'No such portal. Check /listtele again?'])
-			return
-		if not self.portals[args].get('username', '') == username:
-			self.send('pm', [username, 'You do not own this portal.'])
-			return
+			return 'No such portal. Check /listtele again?'
+		if not self.portals[args]['username'] == username:
+			return 'You do not own this portal.'
+		assert self.pay_fee(username, -50)
 		del self.portals[args]
 		self.save_portals()
-		self.send('pm', [username, 'Removed teleport location.'])
+		return 'Removed teleport location. Refunded 50 coins.'
 
 	def command_tele(self, username, args):
-		loc = self.portals[args].get('loc', None)
-		if not loc:
-			self.send('pm', [username, 'No such portal. Check /listtele again?'])
-			return
-		self.send('teleportplayer', [username] + loc)
-		self.send('pm', [username, f'Welcome to {args}!'])
+		if not args in self.portals:
+			return 'No such portal. Check /listtele again?'
+		if not self.pay_fee(username, 1):
+			return 'Insufficient funds. Cost is 1 coin.'
+		self.send('teleportplayer', [username] + self.portals[args]['loc'])
+		return f'Welcome to {args}!'
 
 	def command_sethome(self, username, args):
-		self.send('pm', [username, 'Setting home location, hold still...'])
+		if not self.pay_fee(username, 10):
+			return 'Insufficient funds. Cost is 10 coins.'
 		self.send('listplayers', [])
-		self.events.append(('home', username, None))
+		self.trigger('home', username, [])
+		return 'Setting home location, hold still...'
 
 	def command_home(self, username, args):
 		home = self.players[username].get('home', None)
 		if not home:
-			self.send('pm', [username, 'Cannot find home. Please use /sethome first.'])
-			return
+			return 'Cannot find home. Please use /sethome first.'
 		self.send('teleportplayer', [username, home])
-		self.send('pm', [username, 'Welcome home!'])
+		return 'Welcome home!'
 
 	def command_visit(self, username, args):
-		self.send('pm', [username, 'Zoop!'])
+		if not self.pay_fee(username, 1):
+			return 'Insufficient funds. Cost is 1 coin.'
 		self.send('teleportplayer', [username, args])
+		return 'Zoop!'
 
-	def command_bag(self, player, args):
+	def command_bag(self, username, args):
 		bag = self.players[username].get('bag', None)
 		if not bag:
-			self.send('pm', [username, 'Cannot locate bag.'])
-			return
-		self.send('pm', [username, 'Zoop!'])
+			return 'Cannot locate bag.'
+		if not self.pay_fee(username, 1):
+			return 'Insufficient funds. Cost is 1 coin.'
 		self.send('teleportplayer', [username] + bag)
+		return 'Zoop!'
+
+	def command_wallet(self, username, args):
+		balance = self.players[username]['balance']
+		return f'You have {balance} coins in your wallet.'
+
+	def command_pay(self, username, args):
+		try:
+			amount, recipient = args.split(' ', 1)
+			amount = int(amount)
+			assert amount > 0
+			assert recipient
+		except:
+			return f'Usage: /pay <amount> <username>'
+		balance = self.players[username]['balance']
+		if amount > balance:
+			return f'You only have {balance} coins in your wallet.'
+		return f'Sending payment...'
+		self.trigger('pay', recipient, [username, amount])
+		self.send('listplayers', [])

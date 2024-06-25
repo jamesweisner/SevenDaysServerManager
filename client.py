@@ -12,7 +12,7 @@ class Client:
 				self.conn.connect((hostname, port))
 				self.conn.settimeout(None)
 				break # Success!
-			except (timeout, error) as e:
+			except (ConnectionResetError, timeout, error) as e:
 				tries += 1
 				for seconds in range(5, 0, -1):
 					print(f' [{tries}] Connection failed, retrying in {seconds}...', end='\r')
@@ -42,18 +42,19 @@ class Client:
 
 	def readlines(self):
 		flushed = not self.buffer
-		while True:
-			if flushed:
-				data = self.conn.recv(1024)
-				if not data:
-					break # Connection closed
-				self.buffer += data.decode('ascii')
-			while '\n' in self.buffer:
-				line, self.buffer = self.buffer.split('\n', 1)
-				yield line.replace('\r', '')
-			flushed = True
-		if self.buffer:
-			yield self.buffer
+		with open('logs.txt', 'a') as file:
+			while True:
+				if flushed:
+					data = self.conn.recv(1024)
+					if not data:
+						break # Connection closed
+					self.buffer += data.decode('ascii')
+				while '\n' in self.buffer:
+					line, self.buffer = self.buffer.split('\r\n', 1)
+					file.write(line.encode('ascii').decode('utf-8') + u'\n')
+					file.flush()
+					yield line
+				flushed = True
 
 	def send(self, message):
 		self.conn.sendall((message + '\n').encode('ascii'))

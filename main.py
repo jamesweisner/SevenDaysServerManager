@@ -1,7 +1,9 @@
 import config
 from re import compile
+from time import sleep
 from client import Client
 from manager import Manager
+from traceback import print_exc
 
 chat_regex = compile(
 	# 2024-06-24T21:23:45 716.910 INF Chat (from '...', entity id '172', to 'Global'): 'PhysicsPolice': /test
@@ -22,44 +24,53 @@ bag_regex = compile(
 	r"\((?P<location>.+?)\).*"
 )
 
-print(f'Connecting to {config.hostname}:{config.port}')
-client = Client(config.hostname, config.port)
-
-print(f'Logging in...')
-client.login(config.password)
-
-manager = Manager(client)
-
 try:
-	print(f'Managing server: {client.name}')
-	for line in client.readlines():
+	while True:
 
-		# Watch for player list updates.
-		match = player_regex.match(line)
-		if match:
-			pid, username, location = match.groups()
-			location = [round(float(d)) for d in location.split(', ')]
-			manager.set_player(int(pid), username, location)
-			continue
+		print(f'Connecting to {config.hostname}:{config.port}')
+		client = Client(config.hostname, config.port)
 
-		# Watch for dropped bags.
-		match = bag_regex.match(line)
-		if match:
-			pid, location = match.groups()
-			location = [round(float(d)) for d in location.split(', ')]
-			manager.set_bag(int(pid), location)
-			continue
+		print(f'Logging in...', end='\r')
+		if not client.login(config.password):
+			exit('Login failed!')
 
-		# Watch player chat for commands.
-		match = chat_regex.match(line)
-		if match:
-			username, message = match.groups()
-			if not message[0] == '/':
-				continue # Not a command.
-			command, args = (message[1:] + ' ').split(' ', 1)
-			manager.handle(username, command, args.strip())
-			continue
+		manager = Manager(client)
+		print(f'Managing server: {client.name}')
+
+		try:
+			for line in client.readlines():
+
+				# Watch for player list updates.
+				match = player_regex.match(line)
+				if match:
+					pid, username, location = match.groups()
+					location = [round(float(d)) for d in location.split(', ')]
+					manager.set_player(int(pid), username, location)
+					continue
+
+				# Watch for dropped bags.
+				match = bag_regex.match(line)
+				if match:
+					pid, location = match.groups()
+					location = [round(float(d)) for d in location.split(', ')]
+					manager.set_bag(int(pid), location)
+					continue
+
+				# Watch player chat for commands.
+				match = chat_regex.match(line)
+				if match:
+					username, message = match.groups()
+					if not message[0] == '/':
+						continue # Not a command.
+					command, args = (message[1:] + ' ').split(' ', 1)
+					manager.handle(username, command, args.strip())
+					continue
+
+		except Exception:
+			print_exc()
+
+		print('Connection lost, reconnecting in 5 seconds...')
+		sleep(5)
 
 except KeyboardInterrupt:
-	print('Shutting down...')
-	client.close()
+	print('\nShutting down...')

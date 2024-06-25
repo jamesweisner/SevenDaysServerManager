@@ -2,6 +2,8 @@ from json import load, dump, dumps
 
 class Manager:
 
+	# TODO implement zcoins and charge for services
+
 	def __init__(self, client):
 		self.client = client
 		self.events = []

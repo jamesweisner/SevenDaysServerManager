@@ -1,26 +1,43 @@
-from socket import socket, AF_INET, SOCK_STREAM
+from socket import socket, AF_INET, SOCK_STREAM, error, timeout
+from time import sleep
 
 class Client:
 
 	def __init__(self, hostname, port):
-
-		self.conn = socket(AF_INET, SOCK_STREAM)
-		self.conn.connect((hostname, port))
+		tries = 0
+		while True:
+			try:
+				self.conn = socket(AF_INET, SOCK_STREAM)
+				self.conn.settimeout(5)
+				self.conn.connect((hostname, port))
+				self.conn.settimeout(None)
+				break # Success!
+			except (timeout, error) as e:
+				tries += 1
+				for seconds in range(5, 0, -1):
+					print(f' [{tries}] Connection failed, retrying in {seconds}...', end='\r')
+					sleep(1)
+				print(f' [{tries}] Connection failed, retrying...     ', end='\r')
 		self.buffer = ''
 
 	def login(self, password):
-		assert self.wait_for('Please enter password:')
+		assert self.wait_for('Please enter password')
 		self.send(password)
-		assert self.wait_for('Logon successful.')
+		if not self.wait_for('Logon successful', 'Password incorrect'):
+			return False
 		for line in self.readlines():
 			if 'Game name:' in line:
 				self.name = line.split(':')[1].strip()
 				break
+		assert self.name
+		return True
 
-	def wait_for(self, target):
+	def wait_for(self, target, failure=None):
 		for line in self.readlines():
 			if target in line:
 				return True
+			if failure and failure in line:
+				return False
 		return False
 
 	def readlines(self):
@@ -41,6 +58,3 @@ class Client:
 	def send(self, message):
 		self.conn.sendall((message + '\n').encode('ascii'))
 		self.conn.sendall('\n'.encode('ascii'))
-
-	def close(self):
-		self.conn.close()

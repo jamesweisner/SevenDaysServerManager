@@ -49,7 +49,7 @@ class Client:
 					if not data:
 						break # Connection closed
 					self.buffer += data.decode('ascii')
-				while '\n' in self.buffer:
+				while '\r\n' in self.buffer:
 					line, self.buffer = self.buffer.split('\r\n', 1)
 					file.write(line.encode('ascii').decode('utf-8') + u'\n')
 					file.flush()

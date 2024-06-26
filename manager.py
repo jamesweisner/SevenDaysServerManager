@@ -74,23 +74,30 @@ class Manager:
 						'username': username,
 					}
 					self.save_portals()
-					self.events.remove(item)
 					self.send('pm', [username, 'Portal set.'])
+					self.events.remove(item)
 					continue
 				if event == 'home':
 					self.players[username]['home'] = location # A coordinate list.
 					self.save_players()
-					self.events.remove(item)
 					self.send('pm', [username, 'Home set.'])
+					self.events.remove(item)
 					continue
 				if event == 'pay':
 					sender, amount = args
 					self.players[sender]['balance'] -= amount
 					self.players[username]['balance'] += amount
 					self.save_players()
-					self.events.remove(item)
 					self.send('pm', [sender, f'Sent {amount} coins to {username}.'])
 					self.send('pm', [username, f'Received {amount} coins from {sender}.'])
+					self.events.remove(item)
+					continue
+			if username.lower().startswith(key):
+				if event == 'visit':
+					self.send('teleportplayer', [args, username])
+					self.send('pm', [visitor, 'Zoop!'])
+					self.send('pm', [username, f'{username} is here visit you.'])
+					self.events.remove(item)
 					continue
 			if key == pid:
 				if event == 'bag':
@@ -100,7 +107,9 @@ class Manager:
 					continue
 			if time() > expires:
 				if event == 'pay':
-					self.send('pm', [sender, f'Recipient not found. Players must be online to receive funds.'])
+					self.send('pm', [args[0], 'Recipient not found. Players must be online to receive funds.'])
+				if event == 'visit':
+					self.send('pm', [args[0], 'Player not found.'])
 				self.events.remove(item)
 
 	def handle_bag(self, pid, location):
@@ -175,10 +184,9 @@ class Manager:
 	def command_visit(self, username, args):
 		if not self.pay_fee(username, 1):
 			return 'Insufficient funds. Cost is 1 coin.'
-		# TODO what if the player is not found?
-		# TODO allow username abbreviation
-		self.send('teleportplayer', [username, args])
-		return 'Zoop!'
+		if not args:
+			return 'Usage: /visit <username>'
+		self.trigger('visit', args.lower(), [username])
 
 	def command_bag(self, username, args):
 		bag = self.players[username].get('bag', None)

@@ -79,6 +79,8 @@ try:
 					manager.handle_kill(username, entity)
 					continue
 
+		except ConnectionResetError:
+			pass # It's the Internet. These things happen.
 		except Exception:
 			print_exc()
 

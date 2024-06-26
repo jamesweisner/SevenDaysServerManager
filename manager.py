@@ -1,6 +1,7 @@
 from json import load, dump, dumps
+from time import sleep, time
+from threading import Thread
 from functools import wraps
-from time import time
 
 class Manager:
 
@@ -9,10 +10,10 @@ class Manager:
 		self.events = []
 		self.commands = {
 			'help': self.command_help,
-			'listtele': self.command_listtele,
-			'settele': self.command_settele,
-			'remtele': self.command_remtele,
-			'tele': self.command_tele,
+			'tplist': self.command_tplist,
+			'tp': self.command_tp,
+			'tpadd': self.command_tpadd,
+			'tpremove': self.command_tpremove,
 			'sethome': self.command_sethome,
 			'home': self.command_home,
 			'visit': self.command_visit,
@@ -68,7 +69,7 @@ class Manager:
 		for item in self.events[:]:
 			event, key, args, expires = item
 			if key == username:
-				if event == 'tele':
+				if event == 'tp':
 					self.portals[args[0]] = {
 						'loc': location,
 						'username': username,
@@ -92,7 +93,7 @@ class Manager:
 					self.send('pm', [username, f'Received {amount} coins from {sender}.'])
 					self.events.remove(item)
 					continue
-			if username.lower().startswith(key):
+			if username.lower().startswith(str(key)):
 				if event == 'visit':
 					self.send('teleportplayer', [args, username])
 					self.send('pm', [visitor, 'Zoop!'])
@@ -131,41 +132,42 @@ class Manager:
 			return
 		print(f' > {username}: /{command} {args}')
 		response = self.commands[command](username, args)
-		self.send('pm', [username, response])
+		if response:
+			self.send('pm', [username, response])
 
 	def command_help(self, username, args):
-		return ' '.join([f'/{c}' for c in self.commands.keys()])
-		# TODO show arguments & coin costs
+		Thread(target=self.help_sender, args=(username,)).start()
+		return None
 
-	def command_listtele(self, username, args):
-		return ', '.join([f'{p}' for p in self.portals.keys()])
+	def command_tplist(self, username, args):
+		return ', '.join([f'{p}' for p in sorted(self.portals.keys())])
 
-	def command_settele(self, username, args):
+	def command_tp(self, username, args):
+		if not args in self.portals:
+			return 'No such portal. Check /tplist again?'
+		if not self.pay_fee(username, 1):
+			return 'Insufficient funds. Cost is 1 coin.'
+		self.send('teleportplayer', [username] + self.portals[args]['loc'])
+		return f'Welcome to {args}!'
+
+	def command_tpadd(self, username, args):
 		if args in self.portals:
 			return 'This portal already exists.'
 		if not self.pay_fee(username, 50):
 			return 'Insufficient funds. Cost is 50 coins.'
 		self.send('listplayers', [])
-		self.trigger('tele', username, [args])
+		self.trigger('tp', username, [args])
 		return 'Setting teleport location, hold still...'
 
-	def command_remtele(self, username, args):
+	def command_tpremove(self, username, args):
 		if not args in self.portals:
-			return 'No such portal. Check /listtele again?'
+			return 'No such portal. Check /tplist again?'
 		if not self.portals[args]['username'] == username:
 			return 'You do not own this portal.'
 		assert self.pay_fee(username, -50)
 		del self.portals[args]
 		self.save_portals()
 		return 'Removed teleport location. Refunded 50 coins.'
-
-	def command_tele(self, username, args):
-		if not args in self.portals:
-			return 'No such portal. Check /listtele again?'
-		if not self.pay_fee(username, 1):
-			return 'Insufficient funds. Cost is 1 coin.'
-		self.send('teleportplayer', [username] + self.portals[args]['loc'])
-		return f'Welcome to {args}!'
 
 	def command_sethome(self, username, args):
 		if not self.pay_fee(username, 10):
@@ -215,3 +217,31 @@ class Manager:
 		return f'Sending payment...'
 		self.trigger('pay', recipient, [username, amount])
 		self.send('listplayers', [])
+
+	def help_sender(self, username):
+		# We can't spam the chat too quickly.
+		# This takes a while, so it's in a thread.
+		lines = [
+			'/help - This help menu',
+			'/tplist - List portals',
+			'/tp <portal> - Go to portal (1)',
+			'/tpadd <portal> - Add portal (50)',
+			'/tpdelete <portal> - Remove portal',
+			'/sethome - Set home location (10)',
+			'/home - Go to home location',
+			'/visit <username> - Go to a player (1)',
+			'/bag - Go to bag location (1)',
+			'/wallet - Your coin balance',
+			'/pay <amount> <username> - Send coins',
+		]
+		for line in lines:
+			colors = [
+				('/', '[ffa500]/'), # Command in orange
+				('- ', '[00ff00]'), # Comments in green
+				('<', '[ffff00]<'), # Arguments in yellow
+				('(', '[0000ff]('), # Fee in blue
+			]
+			for code, color in colors:
+				line = line.replace(code, color)
+			self.send('pm', [username, line])
+			sleep(0.35)

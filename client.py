@@ -12,12 +12,14 @@ class Client:
 				self.conn.connect((hostname, port))
 				self.conn.settimeout(None)
 				break # Success!
-			except (ConnectionResetError, timeout, error) as e:
+			except (timeout, error) as e:
 				tries += 1
 				for seconds in range(5, 0, -1):
 					print(f' [{tries}] Connection failed, retrying in {seconds}...', end='\r')
 					sleep(1)
 				print(f' [{tries}] Connection failed, retrying...     ', end='\r')
+		if tries:
+			print('') # Needed line break
 		self.buffer = ''
 
 	def login(self, password):

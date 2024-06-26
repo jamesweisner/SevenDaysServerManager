@@ -20,7 +20,7 @@ player_regex = compile(
 bag_regex = compile(
 	# 2024-06-24T21:23:45 716.910 INF 86805 EntityBackpack id 1097, plyrId 171, (1092.2, 35.2, -830.5) ...
 	r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2} \d+\.\d+ INF "
-	r"\d+ EntityBackpack id \d+ plyrId (?P<pid>\d+), "
+	r"\d+ EntityBackpack id \d+, plyrId (?P<pid>\d+), "
 	r"\((?P<location>.+?)\).*"
 )
 

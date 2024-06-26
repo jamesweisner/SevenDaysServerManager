@@ -104,15 +104,15 @@ class Manager:
 				self.events.remove(item)
 
 	def handle_bag(self, pid, location):
-		self.init_player(username)
+		if location == [0, 0, 0]:
+			return # Bag not in world yet.
 		self.send('listplayers', [])
 		self.trigger('bag', pid, location)
-		# TODO not working?
 
 	def handle_kill(self, username, entity):
 		self.init_player(username)
-		print(f' x {username}: {entity}')
 		if entity.startswith('zombie'):
+			print(f' x {username}: {entity}')
 			self.players[username]['balance'] += 1
 
 	def handle_command(self, username, command, args):
@@ -176,6 +176,7 @@ class Manager:
 		if not self.pay_fee(username, 1):
 			return 'Insufficient funds. Cost is 1 coin.'
 		# TODO what if the player is not found?
+		# TODO allow username abbreviation
 		self.send('teleportplayer', [username, args])
 		return 'Zoop!'
 

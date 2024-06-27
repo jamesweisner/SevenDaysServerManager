@@ -95,9 +95,10 @@ class Manager:
 					continue
 			if username.lower().startswith(str(key)):
 				if event == 'visit':
-					self.send('teleportplayer', [args, username])
+					visitor, = args
+					self.send('teleportplayer', [visitor, username])
 					self.send('pm', [visitor, 'Zoop!'])
-					self.send('pm', [username, f'{username} is here visit you.'])
+					self.send('pm', [username, f'{visitor} is here visit you.'])
 					self.events.remove(item)
 					continue
 			if key == pid:
@@ -189,6 +190,8 @@ class Manager:
 		if not args:
 			return 'Usage: /visit <username>'
 		self.trigger('visit', args.lower(), [username])
+		self.send('listplayers', [])
+		return 'Searching for player...'
 
 	def command_bag(self, username, args):
 		bag = self.players[username].get('bag', None)
@@ -214,9 +217,9 @@ class Manager:
 		balance = self.players[username]['balance']
 		if amount > balance:
 			return f'You only have {balance} coins in your wallet.'
-		return f'Sending payment...'
 		self.trigger('pay', recipient, [username, amount])
 		self.send('listplayers', [])
+		return f'Sending payment...'
 
 	def help_sender(self, username):
 		# We can't spam the chat too quickly.
@@ -226,7 +229,7 @@ class Manager:
 			'/tplist - List portals',
 			'/tp <portal> - Go to portal (1)',
 			'/tpadd <portal> - Add portal (50)',
-			'/tpdelete <portal> - Remove portal',
+			'/tpremove <portal> - Remove portal',
 			'/sethome - Set home location (10)',
 			'/home - Go to home location',
 			'/visit <username> - Go to a player (1)',
@@ -236,10 +239,10 @@ class Manager:
 		]
 		for line in lines:
 			colors = [
-				('/', '[ffa500]/'), # Command in orange
+				('/', '[ffaa00]/'), # Command in orange
 				('- ', '[00ff00]'), # Comments in green
 				('<', '[ffff00]<'), # Arguments in yellow
-				('(', '[0000ff]('), # Fee in blue
+				('(', '[00aaaa]('), # Fee in blue
 			]
 			for code, color in colors:
 				line = line.replace(code, color)

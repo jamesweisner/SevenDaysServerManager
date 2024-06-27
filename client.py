@@ -61,3 +61,4 @@ class Client:
 	def send(self, message):
 		self.conn.sendall((message + '\n').encode('ascii'))
 		self.conn.sendall('\n'.encode('ascii'))
+		sleep(0.25)

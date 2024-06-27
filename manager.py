@@ -247,4 +247,4 @@ class Manager:
 			for code, color in colors:
 				line = line.replace(code, color)
 			self.send('pm', [username, line])
-			sleep(0.35)
+			sleep(0.1) # Plus 0.25 built in to send()

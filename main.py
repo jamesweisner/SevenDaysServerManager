@@ -14,20 +14,25 @@ chat_regex = compile(
 
 player_regex = compile(
 	# 1. id=171, PhysicsPolice, pos=(1103.7, 35.1, -830.2), ...
-	r"\d+\. id=(?P<pid>\d+), (?P<username>.+?), pos=\((?P<location>.+?)\).*"
+	r"\d+\. id=(?P<pid>\d+), (?P<username>.+?), pos=\((?P<location>.+?)\)"
 )
 
 bag_regex = compile(
 	# 2024-06-24T21:23:45 716.910 INF 86805 EntityBackpack id 1097, plyrId 171, (1092.2, 35.2, -830.5) ...
 	r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2} \d+\.\d+ INF "
 	r"\d+ EntityBackpack id \d+, plyrId (?P<pid>\d+), "
-	r"\((?P<location>.+?)\).*"
+	r"\((?P<location>.+?)\)"
 )
 
 kill_regex = compile(
 	# 2024-06-25T15:08:39 64611.265 INF Entity zombieBurnt 2238 killed by PhysicsPolice 171
 	r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2} \d+\.\d+ INF "
-	r"Entity (?P<entity>.+?) \d+ killed by (?P<username>.+?) \d+"
+	r"Entity (?P<entity>.+?) \d+ killed by (?P<username>.+?) "
+)
+
+time_regex = compile(
+	# Day 61, 00:55
+	r"Day (?P<days>\d+), (?P<hours>\d{2}):(?P<minutes>\d{2})"
 )
 
 try:
@@ -40,7 +45,7 @@ try:
 		if not client.login(config.password):
 			exit('Login failed!')
 
-		manager = Manager(client)
+		manager = Manager(client, config.minutesperday)
 		print(f'Managing server: {client.name}')
 
 		try:
@@ -77,6 +82,13 @@ try:
 				if match:
 					entity, username = match.groups()
 					manager.handle_kill(username, entity)
+					continue
+
+				# Watch for status heart beat.
+				match = time_regex.match(line)
+				if match:
+					days, hours, minutes = map(int, match.groups())
+					manager.handle_time(days, hours, minutes)
 					continue
 
 		except ConnectionResetError:

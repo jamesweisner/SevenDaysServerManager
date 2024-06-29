@@ -2,11 +2,14 @@ from json import load, dump, dumps
 from time import sleep, time
 from threading import Thread
 from functools import wraps
+from datetime import date, timedelta
+from random import choice
 
 class Manager:
 
-	def __init__(self, client):
+	def __init__(self, client, minutesperday):
 		self.client = client
+		self.minutesperday = minutesperday
 		self.events = []
 		self.commands = {
 			'help': self.command_help,
@@ -20,6 +23,9 @@ class Manager:
 			'bag': self.command_bag,
 			'wallet': self.command_wallet,
 			'pay': self.command_pay,
+			'pack': self.command_pack,
+			'gimme': self.command_gimme,
+			'horde': self.command_horde,
 		}
 		try:
 			with open('players.json') as file:
@@ -117,14 +123,31 @@ class Manager:
 	def handle_bag(self, pid, location):
 		if location == [0, 0, 0]:
 			return # Bag not in world yet.
-		self.send('listplayers', [])
 		self.trigger('bag', pid, location)
+		self.send('listplayers', [])
 
 	def handle_kill(self, username, entity):
 		self.init_player(username)
 		if entity.startswith('zombie'):
 			print(f' x {username}: {entity}')
 			self.players[username]['balance'] += 1
+
+	def handle_time(self, days, hours, minutes):
+		horde = (days // 7 + 1) * 7
+		duration = timedelta(days=horde - days, hours=22 - hours, minutes=0 - minutes)
+		seconds = duration.total_seconds() * (self.minutesperday / 1440)
+		hands = [
+			('hour', int(seconds // 3600)),
+			('minute', int((seconds % 3600) // 60)),
+		]
+		time = ' and '.join(
+			[f'{value} {label}' + ('' if value == 1 else 's') for label, value in hands if value]
+		)
+		for item in self.events[:]:
+			event, username = item[:2]
+			self.send('pm', [username, f'Blood moon is on day [ffff00]{horde}[ff0000].'])
+			self.send('pm', [username, f'It begins in [ffff00]{time} [ff0000]IRL.'])
+			self.events.remove(item)
 
 	def handle_command(self, username, command, args):
 		self.init_player(username)
@@ -158,9 +181,9 @@ class Manager:
 			return 'This portal already exists.'
 		if not self.pay_fee(username, 50):
 			return 'Insufficient funds. Cost is 50 coins.'
-		self.send('listplayers', [])
 		self.trigger('tp', username, [portal.lower()])
-		return 'Setting teleport location, hold still...'
+		self.send('listplayers', [])
+		return None
 
 	def command_tpremove(self, username, args):
 		portal = args.lower()
@@ -176,9 +199,9 @@ class Manager:
 	def command_sethome(self, username, args):
 		if not self.pay_fee(username, 10):
 			return 'Insufficient funds. Cost is 10 coins.'
-		self.send('listplayers', [])
 		self.trigger('home', username, [])
-		return 'Setting home location, hold still...'
+		self.send('listplayers', [])
+		return None
 
 	def command_home(self, username, args):
 		home = self.players[username].get('home', None)
@@ -194,7 +217,7 @@ class Manager:
 			return 'Usage: /visit <username>'
 		self.trigger('visit', args.lower(), [username])
 		self.send('listplayers', [])
-		return 'Searching for player...'
+		return None
 		# TODO security
 		# TODO more responsive error when player not found
 
@@ -224,7 +247,63 @@ class Manager:
 			return f'You only have {balance} coins in your wallet.'
 		self.trigger('pay', recipient, [username, amount])
 		self.send('listplayers', [])
-		return f'Sending payment...'
+		return None
+
+	def command_pack(self, username, args):
+		self.init_player(username)
+		if self.players[username].get('pack', False):
+			return f'Sorry, you already got your starter pack.'
+		self.give_items(username, [
+			('foodShamChowder', 10),
+			('drinkJarPureMineralWater', 10),
+			('medicalFirstAidBandage', 5),
+			('drugHerbalAntibiotics', 5),
+		])
+		self.players[username]['pack'] = True
+		self.save_players()
+		return f'Enjoy your starter pack!'
+
+	def command_gimme(self, username, args):
+		self.init_player(username)
+		today = date.today().strftime('%Y-%m-%d')
+		gimme = self.players[username].get('gimme', None)
+		if gimme == today:
+			return f'Sorry, you already got your free items today.'
+		candy = [
+			'drugCovertCats',
+			'drugEyeKandy',
+			'drugHackers',
+			'drugHealthBar',
+			'drugJailBreakers',
+			'drugNerdTats',
+			'drugOhShitzDrops',
+			'drugRockBusters',
+			'drugSkullCrushers',
+			'drugSugarButts',
+		]
+		ammo = [
+			'ammoBundle9mmBulletBall',
+			'ammoBundle44MagnumBulletBall',
+			'ammoBundle762mmBulletBall',
+			'ammoBundleShotgunShell',
+		]
+		self.give_items(username, [
+			(choice(candy), 1),
+			(choice(ammo), 1),
+			('questRewardT1SkillMagazineBundle', 1),
+		])
+		self.players[username]['gimme'] = today
+		self.save_players()
+		return f'Enjoy your free items!'
+
+	def give_items(self, username, items):
+		for item, amount in items:
+			self.send('give', [username, item, amount])
+
+	def command_horde(self, username, args):
+		self.trigger('horde', username, [])
+		self.send('gettime', [])
+		return None
 
 	def help_sender(self, username):
 		# We can't spam the chat too quickly.
@@ -241,6 +320,9 @@ class Manager:
 			'/bag - Go to bag location (1)',
 			'/wallet - Your coin balance',
 			'/pay <amount> <username> - Send coins',
+			'/pack - Get your one-time starter pack',
+			'/gimme - Get your free daily items',
+			'/horde - How long until blood moon?',
 		]
 		for line in lines:
 			colors = [
@@ -252,4 +334,4 @@ class Manager:
 			for code, color in colors:
 				line = line.replace(code, color)
 			self.send('pm', [username, line])
-			sleep(0.1) # Plus 0.25 built in to send()
+			sleep(0.25) # Plus 0.25 built in to send()

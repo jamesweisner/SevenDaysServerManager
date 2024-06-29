@@ -69,7 +69,7 @@ try:
 					if not message[0] == '/':
 						continue # Not a command.
 					command, args = (message[1:] + ' ').split(' ', 1)
-					manager.handle_command(username, command, args.strip())
+					manager.handle_command(username, command.lower(), args.strip())
 					continue
 
 				# Watch for Zombie kills.

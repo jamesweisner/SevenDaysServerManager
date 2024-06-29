@@ -144,29 +144,32 @@ class Manager:
 		return ', '.join([f'{p}' for p in sorted(self.portals.keys())])
 
 	def command_tp(self, username, args):
-		if not args in self.portals:
+		portal = args.lower()
+		if not portal in self.portals.keys():
 			return 'No such portal. Check /tplist again?'
 		if not self.pay_fee(username, 1):
 			return 'Insufficient funds. Cost is 1 coin.'
-		self.send('teleportplayer', [username] + self.portals[args]['loc'])
-		return f'Welcome to {args}!'
+		self.send('teleportplayer', [username] + self.portals[portal]['loc'])
+		return f'Welcome to {portal}!'
 
 	def command_tpadd(self, username, args):
-		if args in self.portals:
+		portal = args.lower()
+		if portal in self.portals:
 			return 'This portal already exists.'
 		if not self.pay_fee(username, 50):
 			return 'Insufficient funds. Cost is 50 coins.'
 		self.send('listplayers', [])
-		self.trigger('tp', username, [args])
+		self.trigger('tp', username, [portal.lower()])
 		return 'Setting teleport location, hold still...'
 
 	def command_tpremove(self, username, args):
-		if not args in self.portals:
+		portal = args.lower()
+		if not portal in self.portals:
 			return 'No such portal. Check /tplist again?'
-		if not self.portals[args]['username'] == username:
+		if not self.portals[portal]['username'] == username:
 			return 'You do not own this portal.'
 		assert self.pay_fee(username, -50)
-		del self.portals[args]
+		del self.portals[portal]
 		self.save_portals()
 		return 'Removed teleport location. Refunded 50 coins.'
 
@@ -192,6 +195,8 @@ class Manager:
 		self.trigger('visit', args.lower(), [username])
 		self.send('listplayers', [])
 		return 'Searching for player...'
+		# TODO security
+		# TODO more responsive error when player not found
 
 	def command_bag(self, username, args):
 		bag = self.players[username].get('bag', None)

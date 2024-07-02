@@ -1,4 +1,5 @@
 *.json
-*.txt
+logs.txt
 config.py
 __pycache__
+*.xml

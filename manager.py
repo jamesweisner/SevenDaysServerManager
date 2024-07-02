@@ -146,6 +146,7 @@ class Manager:
 		for item in self.events[:]:
 			event, username = item[:2]
 			self.send('pm', [username, f'Blood moon is on day [ffff00]{horde}[ff0000].'])
+			sleep(0.25)
 			self.send('pm', [username, f'It begins in [ffff00]{time} [ff0000]IRL.'])
 			self.events.remove(item)
 

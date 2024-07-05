@@ -3,6 +3,7 @@ from re import compile
 from time import sleep
 from client import Client
 from manager import Manager
+from messenger import Messenger
 from traceback import print_exc
 
 chat_regex = compile(
@@ -46,6 +47,7 @@ try:
 			exit('Login failed!')
 
 		manager = Manager(client, config.minutesperday)
+		messenger = Messenger(client, config.restarttime)
 		print(f'Managing server: {client.name}')
 
 		try:
@@ -100,4 +102,6 @@ try:
 		sleep(5)
 
 except KeyboardInterrupt:
+	messenger.haulting.set()
+	messenger.thread.join()
 	print('\nShutting down...')

@@ -40,6 +40,12 @@ class Manager:
 			self.portals = {}
 			self.save_portals()
 
+		# Initialize lookup dictionary for known Steam IDs.
+		self.steam_ids = {}
+		for username, player in self.players.items():
+			if 'steam_id' in player:
+				self.steam_ids[player['steam_id']] = username
+
 	def save_players(self):
 		with open('players.json', 'w') as file:
 			dump(self.players, file, indent=2)
@@ -66,14 +72,26 @@ class Manager:
 			self.players[username] = { 'balance': 0 }
 			self.save_players()
 
-	def handle_player(self, pid, username, location):
+	def handle_player(self, pid, username, location, steam_id):
 
-		# Track every player we see.
-		self.init_player(username)
+		# Permanently link username & Steam ID when we first see player activity.
+		if not steam_id in self.steam_ids:
+			self.steam_ids[steam_id] = username
+			self.init_player(username)
+			self.players[username]['steam_id'] = steam_id
+			self.save_players()
+
+		# Don't recognize Steam players who have changed their username!
+		if self.steam_ids[steam_id] != username:
+			print(f' ! {steam_id} is now named {username}')
+			return
 
 		# Work on a copy of the list so we can saefly remove items from the original.
 		for item in self.events[:]:
 			event, key, args, expires = item
+			if key == steam_id:
+				if event == 'chat':
+					self.handle_command(steam_id, args[0], args[1:])
 			if key == username:
 				if event == 'tp':
 					self.portals[args[0]] = {
@@ -134,6 +152,8 @@ class Manager:
 
 	def handle_time(self, days, hours, minutes):
 		horde = (days // 7 + 1) * 7
+		if days + 7 == horde and hours < 22:
+			horde -= 7
 		duration = timedelta(days=horde - days, hours=22 - hours, minutes=0 - minutes)
 		seconds = duration.total_seconds() * (self.minutesperday / 1440)
 		hands = [
@@ -151,8 +171,15 @@ class Manager:
 				self.send('pm', [username, f'It begins in [ffff00]{time} [ff0000]IRL.'])
 				self.events.remove(item)
 
-	def handle_command(self, username, command, args):
-		self.init_player(username)
+	def handle_command(self, steam_id, command, args):
+
+		# If we don't know this Steam ID yet, the command has to be deferred until it's found.
+		if not steam_id in self.steam_ids:
+			self.trigger('chat', steam_id, [command] + args)
+			return
+
+		# Immediately run the command from known Steam account.
+		username = self.steam_ids[steam_id]
 		if not command in self.commands:
 			self.send('pm', [username, 'Unknown command. Type /help to list commands.'])
 			return
@@ -212,6 +239,8 @@ class Manager:
 		self.send('teleportplayer', [username] + home)
 		return 'Welcome home!'
 
+	# TODO let players decline visitation
+	# TODO more responsive error when player not found
 	def command_visit(self, username, args):
 		if not self.pay_fee(username, 1):
 			return 'Insufficient funds. Cost is 1 coin.'
@@ -220,8 +249,6 @@ class Manager:
 		self.trigger('visit', args.lower(), [username])
 		self.send('listplayers', [])
 		return None
-		# TODO security
-		# TODO more responsive error when player not found
 
 	def command_bag(self, username, args):
 		bag = self.players[username].get('bag', None)
@@ -252,7 +279,6 @@ class Manager:
 		return None
 
 	def command_pack(self, username, args):
-		self.init_player(username)
 		if self.players[username].get('pack', False):
 			return f'Sorry, you already got your starter pack.'
 		self.give_items(username, [
@@ -266,7 +292,6 @@ class Manager:
 		return f'Enjoy your starter pack!'
 
 	def command_gimme(self, username, args):
-		self.init_player(username)
 		today = date.today().strftime('%Y-%m-%d')
 		gimme = self.players[username].get('gimme', None)
 		if gimme == today:

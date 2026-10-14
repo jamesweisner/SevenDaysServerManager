@@ -72,6 +72,8 @@ try:
 				match = chat_regex.match(line)
 				if match:
 					steam_id, message = match.groups()
+					if ': ' in message:
+						message = message.split(': ')[1] # Trim display name prefix
 					if not message[0] == '/':
 						continue # Not a command.
 					command, args = (message[1:] + ' ').split(' ', 1)

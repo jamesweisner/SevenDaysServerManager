@@ -86,12 +86,12 @@ class Manager:
 			print(f' ! {steam_id} is now named {username}')
 			return
 
-		# Work on a copy of the list so we can saefly remove items from the original.
+		# Work on a copy of the list so we can safely remove items from the original.
 		for item in self.events[:]:
 			event, key, args, expires = item
 			if key == steam_id:
 				if event == 'chat':
-					self.handle_command(steam_id, args[0], args[1:])
+					self.handle_command(steam_id, args[0], args[1])
 			if key == username:
 				if event == 'tp':
 					self.portals[args[0]] = {
@@ -175,7 +175,7 @@ class Manager:
 
 		# If we don't know this Steam ID yet, the command has to be deferred until it's found.
 		if not steam_id in self.steam_ids:
-			self.trigger('chat', steam_id, [command] + args)
+			self.trigger('chat', steam_id, [command, args])
 			return
 
 		# Immediately run the command from known Steam account.

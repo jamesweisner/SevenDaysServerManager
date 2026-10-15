@@ -107,3 +107,15 @@ toolBeaker
 casinoCoin
 masterSkillMagazine
 schematicMaster
+foodGrilledMeat
+foodSteakAndPotato
+drinkJarEmpty
+medicalAloeCream
+drinkJarGrandpasLearningElixir
+resourcePaint
+drugSugarButts
+resourceChickenFeed
+foodPumpkinCheesecake
+resourceScopeLens
+foodHoneyBrisket
+resourceDuctTape

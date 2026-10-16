@@ -145,6 +145,8 @@ class Manager:
 		self.send('listplayers', [])
 
 	def handle_kill(self, username, entity):
+		if username.startswith('zombie') or username.startswith('animal'):
+			return # Ignore zombies fighting with animals
 		self.init_player(username)
 		if entity.startswith('zombie'):
 			print(f' x {username}: {entity}')

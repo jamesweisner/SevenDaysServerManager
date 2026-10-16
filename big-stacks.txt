@@ -113,9 +113,16 @@ drinkJarEmpty
 medicalAloeCream
 drinkJarGrandpasLearningElixir
 resourcePaint
-drugSugarButts
 resourceChickenFeed
 foodPumpkinCheesecake
 resourceScopeLens
 foodHoneyBrisket
 resourceDuctTape
+foodCornMeal
+foodShamSandwich
+drinkJarGrandpasAwesomeSauce
+drugAtomJunkies
+resourceAnimalFat
+resourceFeather
+foodEgg
+foodRoadrunnerChickenJerky

@@ -178,6 +178,7 @@ class Manager:
 		# If we don't know this Steam ID yet, the command has to be deferred until it's found.
 		if not steam_id in self.steam_ids:
 			self.trigger('chat', steam_id, [command, args])
+			self.send('listplayers', []) # List players to trigger the deferred command.
 			return
 
 		# Immediately run the command from known Steam account.

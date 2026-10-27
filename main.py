@@ -7,9 +7,9 @@ from messenger import Messenger
 from traceback import print_exc
 
 chat_regex = compile(
-	# 2024-08-16T01:16:43 146.851 INF Chat (from 'Steam_1234567890', entity id '123', to 'Global'): /test
+	# 2024-08-16T01:16:43 146.851 INF Chat (from 'Steam_1234567890', entity id '123', to 'Global'): 'DisplayName': /test
 	r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2} \d+\.\d+ INF "
-	r"Chat \(from '(?P<steam_id>.+?)'.+?: (?P<message>.+)"
+	r"Chat \(from '(?P<steam_id>.+?)'.+?: '.+?': (?P<message>.+)"
 )
 
 player_regex = compile(

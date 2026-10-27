@@ -27,7 +27,7 @@ bag_regex = compile(
 kill_regex = compile(
 	# 2024-06-25T15:08:39 64611.265 INF Entity zombieBurnt 2238 killed by PhysicsPolice 123
 	r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2} \d+\.\d+ INF "
-	r"Entity (?P<entity>.+?) \d+ killed by (?P<username>.+?) "
+	r"Entity (?P<entity>.+?) \d+ killed by (?P<username>.+) \d+"
 )
 
 time_regex = compile(
